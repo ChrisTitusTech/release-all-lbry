@@ -1,0 +1,18 @@
+#!/bin/bash
+
+case "$(pidof lbry | wc -w)" in
+
+  0) echo "LBRY Desktop App Not Running -- Quitting"
+     ;;
+  *) echo "Starting Claim list script"
+WALLETID=$(/opt/LBRY/resources/static/daemon/lbrynet channel list | grep claim_id | awk '{print $2}' | tr -d '"' | tr -d ',' | head -n 1)
+echo "Your Channel Wallet ID is ${WALLETID}"
+/opt/LBRY/resources/static/daemon/lbrynet claim list --page=1 --page_size=1000 | grep claim_id | awk '{print $2}' | sed '/${WALLETID}/d' | tr -d '"' | tr -d ',' > claims
+sed -i -e 's/^/\/opt\/LBRY\/resources\/static\/daemon\/lbrynet support abandon --claim_id=/' claims
+chmod +x claims
+echo "Last 1000 claims outputted to bash file named claims"
+./claims
+rm claims -f
+;;
+esac
+
