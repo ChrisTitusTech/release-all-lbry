@@ -1,18 +1,33 @@
 #!/bin/bash
 
-case "$(pidof lbry | wc -w)" in
+# Change IFS from default to new line
+OLDIFS=$IFS
+IFS=\n
 
-  0) echo "LBRY Desktop App Not Running -- Quitting"
-     ;;
-  *) echo "Starting Claim list script"
-WALLETID=$(/opt/LBRY/resources/static/daemon/lbrynet channel list | grep claim_id | awk '{print $2}' | tr -d '"' | tr -d ',' | head -n 1)
-echo "Your Channel Wallet ID is ${WALLETID}"
-/opt/LBRY/resources/static/daemon/lbrynet claim list --page=1 --page_size=1000 | grep claim_id | awk '{print $2}' | sed '/${WALLETID}/d' | tr -d '"' | tr -d ',' > claims
-sed -i -e 's/^/\/opt\/LBRY\/resources\/static\/daemon\/lbrynet support abandon --claim_id=/' claims
-chmod +x claims
-echo "Last 1000 claims outputted to bash file named claims"
-./claims
-rm claims -f
-;;
-esac
+run() {
+  # Check if lbry is running, if not, exit out safely.
+  pidof lbry > /dev/null 2>&1
+  if [ $? -gt 0 ]; then
+    echo "LBRY Desktop App Not Running -- Quitting"
+    return
+  fi
 
+  echo "Starting Claim list script"
+  # Get the Wallet ID
+  WALLETID=$(/opt/LBRY/resources/static/daemon/lbrynet channel list | grep claim_id | awk '{print $2}' | tr -d '"' | tr -d ',' | head -n 1)
+  # Check if the wallet id command failed, if it did, exit out safely
+  if [ $? -gt 0 ]; then
+    echo "An error occurred while getting your Wallet ID, quitting out"
+    return
+  fi
+  echo "Your Channel Wallet ID is ${WALLETID}"
+  # For each of the claims build a claim command, then execute it.
+  for claimCmd in $(opt/LBRY/resources/static/daemon/lbrynet claim list --page=1 --page_size=1000 | grep claim_id | awk '{print $2}' | sed '/${WALLETID}/d' | tr -d '"' | tr -d ',' | -e 's/^/\/opt\/LBRY\/resources\/static\/daemon\/lbrynet support abandon --claim_id=/'); do
+    ${claimCmd}
+  done
+}
+
+run
+
+# Restore IFS
+IFS=$OLDIFS
